@@ -16,6 +16,7 @@
 package com.baomidou.dynamic.datasource.spring.boot.autoconfigure;
 
 import com.baomidou.dynamic.datasource.DynamicRoutingDataSource;
+import com.baomidou.dynamic.datasource.provider.DynamicDataSourceProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.ObjectProvider;
@@ -23,7 +24,6 @@ import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -39,8 +39,7 @@ import java.util.List;
  * @since 1.0.0
  */
 @Slf4j
-@Configuration
-@EnableConfigurationProperties(DynamicDataSourceProperties.class)
+@Configuration(proxyBeanMethods = false)
 @AutoConfigureBefore(
         value = DataSourceAutoConfiguration.class,
         name = {
@@ -64,13 +63,14 @@ public class DynamicDataSourceAutoConfiguration implements InitializingBean {
 
     @Bean
     @ConditionalOnMissingBean
-    public DataSource dataSource() {
-        DynamicRoutingDataSource dataSource = new DynamicRoutingDataSource();
+    public DataSource dataSource(List<DynamicDataSourceProvider> providers) {
+        DynamicRoutingDataSource dataSource = new DynamicRoutingDataSource(providers);
         dataSource.setPrimary(properties.getPrimary());
         dataSource.setStrict(properties.getStrict());
         dataSource.setStrategy(properties.getStrategy());
         dataSource.setP6spy(properties.getP6spy());
         dataSource.setSeata(properties.getSeata());
+        dataSource.setGraceDestroy(properties.getGraceDestroy());
         return dataSource;
     }
 

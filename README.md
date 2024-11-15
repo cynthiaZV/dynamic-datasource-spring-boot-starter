@@ -21,7 +21,7 @@
         <img src="https://img.shields.io/:license-apache-brightgreen.svg" >
     </a>
     <a>
-        <img src="https://img.shields.io/badge/JDK-1.7+-green.svg" >
+        <img src="https://img.shields.io/badge/JDK-8+-green.svg" >
     </a>
     <a>
         <img src="https://img.shields.io/badge/springBoot-1.5.x__2.x.x__3.x.x-green.svg" >
@@ -44,6 +44,10 @@ dynamic-datasource-spring-boot-starter 是一个基于springboot的快速集成�
 ## 文档 | Documentation
 
 详细文档 https://www.kancloud.cn/tracy5546/dynamic-datasource/2264611
+
+## 贡献 | Contributing
+
+我们欢迎社区的贡献，请查看 [CONTRIBUTING.md](./CONTRIBUTING.md) 。
 
 # 特性
 
@@ -68,14 +72,14 @@ dynamic-datasource-spring-boot-starter 是一个基于springboot的快速集成�
 2. 配置文件所有以下划线 `_` 分割的数据源 **首部** 即为组的名称，相同组名称的数据源会放在一个组下。
 3. 切换数据源可以是组名，也可以是具体数据源名称。组名则切换时采用负载均衡算法切换。
 4. 默认的数据源名称为  **master** ，你可以通过 `spring.datasource.dynamic.primary` 修改。
-5. 方法上的注解优先于类上注解。
-6. DS支持继承抽象类上的DS，暂不支持继承接口上的DS。
+5. 代码块里主动切换>方法上的注解优>类上注解（就近原则）。
+6. DS支持继承抽象类上的DS，支持继承接口上的DS。
 
 # 使用方法
 
-1. 引入dynamic-datasource-spring-boot-starter。
+1. 引入`dynamic-datasource-spring-boot-starter`或者`dynamic-datasource-spring-boot3-starter`。
 
-spring-boot 1.5.x 2.x.x
+- spring-boot 1.5.x 2.x.x
 
 ```xml
 
@@ -86,7 +90,7 @@ spring-boot 1.5.x 2.x.x
 </dependency>
 ```
 
-spring-boot3及以上
+- spring-boot3及以上
 
 ```xml
 
@@ -103,8 +107,10 @@ spring-boot3及以上
 spring:
   datasource:
     dynamic:
+      enabled: true #启用动态数据源，默认true
       primary: master #设置默认的数据源或者数据源组,默认值即为master
       strict: false #严格匹配数据源,默认false. true未匹配到指定数据源时抛异常,false使用默认数据源
+      grace-destroy: false #是否优雅关闭数据源，默认为false，设置为true时，关闭数据源时如果数据源中还存在活跃连接，至多等待10s后强制关闭
       datasource:
         master:
           url: jdbc:mysql://xx.xx.xx.xx:3306/dynamic
@@ -125,35 +131,43 @@ spring:
         #以上会配置一个默认库master，一个组slave下有两个子库slave_1,slave_2
 ```
 
+**多主多从：**
 ```yaml
-# 多主多从                      纯粹多库（记得设置primary）                   混合配置
 spring:
-  spring:
-    spring:
-    datasource:
+  datasource:
+    dynamic:
       datasource:
-        datasource:
-        dynamic:
-          dynamic:
-            dynamic:
-            datasource:
-              datasource:
-                datasource:
-                master_1:
-                  mysql:
-                    master:
-                master_2:
-                  oracle:
-                    slave_1:
-                slave_1:
-                  sqlserver:
-                    slave_2:
-                slave_2:
-                  postgresql:
-                    oracle_1:
-                slave_3:
-                  h2:
-                    oracle_2:
+        master_1:
+        master_2:
+        slave_1:
+        slave_2:
+        slave_3:
+```
+
+**纯粹多库：**
+```yaml
+spring:
+  datasource:
+    dynamic:
+      datasource:
+        mysql:
+        oracle:
+        sqlserver:
+        postgresql:
+        h2:
+```
+
+**混合配置：**
+```yaml
+spring:
+  datasource:
+    dynamic:
+      datasource:
+        master:
+        slave_1:
+        slave_2:
+        oracle_1:
+        oracle_2:
 ```
 
 3. 使用  **@DS**  切换数据源。

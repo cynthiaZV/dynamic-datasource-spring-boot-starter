@@ -25,7 +25,6 @@ import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -45,7 +44,6 @@ import java.util.List;
  */
 @Slf4j
 @Configuration
-@EnableConfigurationProperties(DynamicDataSourceProperties.class)
 @AutoConfigureBefore(value = DataSourceAutoConfiguration.class, name = "com.alibaba.druid.spring.boot.autoconfigure.DruidDataSourceAutoConfigure")
 @Import({DruidDynamicDataSourceConfiguration.class, DynamicDataSourceCreatorAutoConfiguration.class, DynamicDataSourceAopConfiguration.class, DynamicDataSourceAssistConfiguration.class})
 @ConditionalOnProperty(prefix = DynamicDataSourceProperties.PREFIX, name = "enabled", havingValue = "true", matchIfMissing = true)
@@ -64,13 +62,14 @@ public class DynamicDataSourceAutoConfiguration implements InitializingBean {
 
     @Bean
     @ConditionalOnMissingBean
-    public DataSource dataSource() {
-        DynamicRoutingDataSource dataSource = new DynamicRoutingDataSource();
+    public DataSource dataSource(List<DynamicDataSourceProvider> providers) {
+        DynamicRoutingDataSource dataSource = new DynamicRoutingDataSource(providers);
         dataSource.setPrimary(properties.getPrimary());
         dataSource.setStrict(properties.getStrict());
         dataSource.setStrategy(properties.getStrategy());
         dataSource.setP6spy(properties.getP6spy());
         dataSource.setSeata(properties.getSeata());
+        dataSource.setGraceDestroy(properties.getGraceDestroy());
         return dataSource;
     }
 

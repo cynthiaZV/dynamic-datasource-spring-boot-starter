@@ -16,15 +16,16 @@
 package com.baomidou.dynamic.datasource.tx;
 
 import com.baomidou.dynamic.datasource.exception.TransactionException;
+import com.baomidou.dynamic.datasource.toolkit.DsStrUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.util.StringUtils;
+import org.springframework.transaction.support.TransactionSynchronization;
 
 import java.util.Objects;
 
 /**
- * 事务模板
+ * AOP事务模板
  *
- * @author Hzh
+ * @author Hzh zp
  */
 @Slf4j
 public class TransactionalTemplate {
@@ -106,22 +107,28 @@ public class TransactionalTemplate {
     private Object doExecute(TransactionalExecutor transactionalExecutor) throws Throwable {
         TransactionalInfo transactionInfo = transactionalExecutor.getTransactionInfo();
         DsPropagation propagation = transactionInfo.propagation;
-        if (!StringUtils.isEmpty(TransactionContext.getXID()) && !propagation.equals(DsPropagation.NESTED)) {
+        if (!DsStrUtils.isEmpty(TransactionContext.getXID()) && !propagation.equals(DsPropagation.NESTED)) {
             return transactionalExecutor.execute();
         }
         boolean state = true;
         Object o;
         String xid = LocalTxUtil.startTransaction();
+        boolean shouldInvokeAction = TransactionContext.getSynchronizations().isEmpty();
         try {
             o = transactionalExecutor.execute();
         } catch (Exception e) {
             state = !isRollback(e, transactionInfo);
             throw e;
         } finally {
+            invokeBeforeCompletion(shouldInvokeAction);
             if (state) {
+                invokeBeforeCommit(shouldInvokeAction);
                 LocalTxUtil.commit(xid);
+                invokeAfterCommit(shouldInvokeAction);
+                invokeAfterCompletion(TransactionSynchronization.STATUS_COMMITTED, shouldInvokeAction);
             } else {
                 LocalTxUtil.rollback(xid);
+                invokeAfterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK, shouldInvokeAction);
             }
         }
         return o;
@@ -209,7 +216,7 @@ public class TransactionalTemplate {
      * @return 是否存在事务
      */
     public boolean existingTransaction() {
-        return !StringUtils.isEmpty(TransactionContext.getXID());
+        return !DsStrUtils.isEmpty(TransactionContext.getXID());
     }
 
     /**
@@ -230,5 +237,50 @@ public class TransactionalTemplate {
      */
     public boolean isNotEmpty(Object[] array) {
         return !isEmpty(array);
+    }
+
+    /**
+     * Invoke before commit.
+     */
+    public void invokeBeforeCommit(boolean shouldInvokeAction) {
+        if (shouldInvokeAction) {
+            for (TransactionSynchronization synchronization : TransactionContext.getSynchronizations()) {
+                synchronization.beforeCommit(false);
+            }
+        }
+    }
+
+    /**
+     * Invoke before completion .
+     */
+    public void invokeBeforeCompletion(boolean shouldInvokeAction) {
+        if (shouldInvokeAction) {
+            for (TransactionSynchronization synchronization : TransactionContext.getSynchronizations()) {
+                synchronization.beforeCompletion();
+            }
+        }
+    }
+
+    /**
+     * Invoke after commit.
+     */
+    public void invokeAfterCommit(boolean shouldInvokeAction) {
+        if (shouldInvokeAction) {
+            for (TransactionSynchronization synchronization : TransactionContext.getSynchronizations()) {
+                synchronization.afterCommit();
+            }
+        }
+    }
+
+    /**
+     * Invoke after completion.
+     */
+    public void invokeAfterCompletion(int status, boolean shouldInvokeAction) {
+        if (shouldInvokeAction) {
+            for (TransactionSynchronization synchronization : TransactionContext.getSynchronizations()) {
+                synchronization.afterCompletion(status);
+            }
+            TransactionContext.removeSynchronizations();
+        }
     }
 }

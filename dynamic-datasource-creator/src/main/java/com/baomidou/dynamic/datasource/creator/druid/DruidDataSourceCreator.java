@@ -75,9 +75,9 @@ public class DruidDataSourceCreator implements DataSourceCreator {
         PARAMS.add("socketTimeout");
     }
 
-    //    @Autowired(required = false)
-//    private ApplicationContext applicationContext;
     private DruidConfig gConfig;
+
+    private DruidFilterCallBack druidFilterCallBack;
 
     /**
      * Druid since 1.2.17 use 'configFromPropeties' to copy config
@@ -111,69 +111,73 @@ public class DruidDataSourceCreator implements DataSourceCreator {
             dataSource.setDriverClassName(driverClassName);
         }
         DruidConfig config = dataSourceProperty.getDruid();
-        Properties properties = DruidConfigUtil.mergeConfig(gConfig, config);
+        DruidConfigUtil.merge(gConfig, config);
+        Properties properties = DruidConfigUtil.toProperties(config);
 
-        List<Filter> proxyFilters = this.initFilters(dataSourceProperty, properties.getProperty("druid.filters"));
+        String configFilters = properties.getProperty("druid.filters");
+        List<Filter> proxyFilters = this.initFilters(config, configFilters);
+        if (druidFilterCallBack != null) {
+            proxyFilters.addAll(druidFilterCallBack.getFilters(config.getProxyFilters()));
+        }
         dataSource.setProxyFilters(proxyFilters);
         try {
             configMethod.invoke(dataSource, properties);
         } catch (Exception ignore) {
-
+            // Druid only prints logs when copying property errors
         }
         //连接参数单独设置
         dataSource.setConnectProperties(config.getConnectionProperties());
         //设置druid内置properties不支持的的参数
         for (String param : PARAMS) {
-            DruidConfigUtil.setValue(dataSource, param, gConfig, config);
+            DruidConfigUtil.setValue(dataSource, param, config);
         }
 
         if (Boolean.FALSE.equals(dataSourceProperty.getLazy())) {
             try {
                 dataSource.init();
-            } catch (SQLException e) {
-                throw new ErrorCreateDataSourceException("druid create error", e);
+            } catch (Exception e) {
+                throw new ErrorCreateDataSourceException(
+                    "dynamic-datasource create datasource named [" + dataSourceProperty.getPoolName() + "] error", e);
             }
         }
         return dataSource;
     }
 
-    private List<Filter> initFilters(DataSourceProperty dataSourceProperty, String filters) {
+    private List<Filter> initFilters(DruidConfig config, String filters) {
         List<Filter> proxyFilters = new ArrayList<>(2);
         if (DsStrUtils.hasText(filters)) {
             String[] filterItems = filters.split(",");
             for (String filter : filterItems) {
                 switch (filter) {
                     case "stat":
-                        proxyFilters.add(DruidStatConfigUtil.toStatFilter(dataSourceProperty.getDruid().getStat(), gConfig.getStat()));
+                        proxyFilters.add(DruidStatConfigUtil.toStatFilter(config.getStat()));
                         break;
                     case "wall":
-                        WallConfig wallConfig = DruidWallConfigUtil.toWallConfig(dataSourceProperty.getDruid().getWall(), gConfig.getWall());
+                        Map<String, Object> configWall = config.getWall();
+                        WallConfig wallConfig = DruidWallConfigUtil.toWallConfig(configWall);
                         WallFilter wallFilter = new WallFilter();
                         wallFilter.setConfig(wallConfig);
+                        String dbType = (String) configWall.get("db-type");
+                        wallFilter.setDbType(dbType);
                         proxyFilters.add(wallFilter);
                         break;
                     case "slf4j":
-                        proxyFilters.add(DruidLogConfigUtil.initFilter(Slf4jLogFilter.class, dataSourceProperty.getDruid().getSlf4j(), gConfig.getSlf4j()));
+                        proxyFilters.add(DruidLogConfigUtil.initFilter(Slf4jLogFilter.class, config.getSlf4j()));
                         break;
                     case "commons-log":
-                        proxyFilters.add(DruidLogConfigUtil.initFilter(CommonsLogFilter.class, dataSourceProperty.getDruid().getCommonsLog(), gConfig.getCommonsLog()));
+                        proxyFilters.add(DruidLogConfigUtil.initFilter(CommonsLogFilter.class, config.getCommonsLog()));
                         break;
                     case "log4j":
-                        proxyFilters.add(DruidLogConfigUtil.initFilter(Log4jFilter.class, dataSourceProperty.getDruid().getLog4j(), gConfig.getLog4j()));
+                        proxyFilters.add(DruidLogConfigUtil.initFilter(Log4jFilter.class, config.getLog4j()));
                         break;
                     case "log4j2":
-                        proxyFilters.add(DruidLogConfigUtil.initFilter(Log4j2Filter.class, dataSourceProperty.getDruid().getLog4j2(), gConfig.getLog4j2()));
+                        proxyFilters.add(DruidLogConfigUtil.initFilter(Log4j2Filter.class, config.getLog4j2()));
                         break;
                     default:
                         log.warn("dynamic-datasource current not support [{}]", filter);
                 }
             }
         }
-//        if (this.applicationContext != null) {
-//            for (String filterId : gConfig.getProxyFilters()) {
-//                proxyFilters.add(this.applicationContext.getBean(filterId, Filter.class));
-//            }
-//        }
         return proxyFilters;
     }
 

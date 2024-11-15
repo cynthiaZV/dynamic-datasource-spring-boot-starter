@@ -23,9 +23,9 @@ import com.baomidou.dynamic.datasource.event.EncDataSourceInitEvent;
 import com.baomidou.dynamic.datasource.provider.DynamicDataSourceProvider;
 import com.baomidou.dynamic.datasource.provider.YmlDynamicDataSourceProvider;
 import com.baomidou.dynamic.datasource.strategy.DynamicDataSourceStrategy;
+import com.baomidou.dynamic.datasource.tx.DsTxEventListenerFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -43,7 +43,6 @@ import java.util.List;
  */
 @Configuration
 @RequiredArgsConstructor
-@EnableConfigurationProperties(DynamicDataSourceProperties.class)
 public class DynamicDataSourceAssistConfiguration {
 
     private final DynamicDataSourceProperties properties;
@@ -72,5 +71,14 @@ public class DynamicDataSourceAssistConfiguration {
         creator.setSeata(properties.getSeata());
         creator.setSeataMode(properties.getSeataMode());
         return creator;
+    }
+
+    @Configuration
+    static class DsTxEventListenerFactoryConfiguration {
+        @Bean
+        @ConditionalOnMissingBean
+        public DsTxEventListenerFactory dsTxEventListenerFactory() {
+            return new DsTxEventListenerFactory();
+        }
     }
 }
